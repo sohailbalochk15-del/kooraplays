@@ -787,17 +787,18 @@ export default function Live() {
             {/*
              * Channel 1 — always mounted; visible when activeChannel === 1.
              * Renders as HlsPlayer for direct .m3u8 URLs, IframePlayer for
-             * embed-page URLs (most football streaming sites). Key changes
-             * only when the URL itself changes (Supabase update).
+             * embed-page URLs (most football streaming sites). Only renders
+             * when a URL is actually configured (mode !== "none").
              */}
-            {getPlayerMode(channels[0].stream_url) === "hls" ? (
+            {getPlayerMode(channels[0].stream_url) === "hls" && (
               <HlsPlayer
                 key={`ch1-hls-${channels[0].stream_url}`}
                 src={channels[0].stream_url}
                 title={channels[0].title}
                 visible={activeChannel === 1}
               />
-            ) : (
+            )}
+            {getPlayerMode(channels[0].stream_url) === "embed" && (
               <IframePlayer
                 key={`ch1-embed-${channels[0].stream_url}`}
                 src={channels[0].stream_url}
@@ -810,14 +811,15 @@ export default function Live() {
              * Channel 2 — always mounted; visible when activeChannel === 2.
              * Completely independent player instance from Channel 1.
              */}
-            {getPlayerMode(channels[1].stream_url) === "hls" ? (
+            {getPlayerMode(channels[1].stream_url) === "hls" && (
               <HlsPlayer
                 key={`ch2-hls-${channels[1].stream_url}`}
                 src={channels[1].stream_url}
                 title={channels[1].title}
                 visible={activeChannel === 2}
               />
-            ) : (
+            )}
+            {getPlayerMode(channels[1].stream_url) === "embed" && (
               <IframePlayer
                 key={`ch2-embed-${channels[1].stream_url}`}
                 src={channels[1].stream_url}
