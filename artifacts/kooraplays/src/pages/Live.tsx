@@ -604,10 +604,18 @@ function IframePlayer({ src, title, visible }: IframePlayerProps) {
         visibility:    visible ? "visible" : "hidden",
       }}
     >
-      {src ? (
+      {/*
+       * Only mount the <iframe> when this channel is ACTIVE.
+       * If we keep it mounted while hidden, the browser treats it as a
+       * background frame and mutes it under autoplay policies — so when
+       * the user switches to it, audio is silenced.
+       *
+       * By unmounting on hide and remounting on show, the iframe starts
+       * fresh. The channel-switcher click counts as a user gesture, so
+       * the browser permits unmuted autoplay for the new iframe.
+       */}
+      {visible && src && (
         <iframe
-          // Keyed on src so a new iframe is created if the URL changes
-          key={src}
           src={src}
           title={title}
           className="w-full h-full border-0"
@@ -616,10 +624,6 @@ function IframePlayer({ src, title, visible }: IframePlayerProps) {
           referrerPolicy="no-referrer-when-downgrade"
           scrolling="no"
         />
-      ) : (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <RefreshCw className="h-8 w-8 animate-spin text-primary/60" />
-        </div>
       )}
     </div>
   );
