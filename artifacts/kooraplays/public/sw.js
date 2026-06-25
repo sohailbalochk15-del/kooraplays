@@ -1,4 +1,4 @@
-const CACHE_NAME = "kooraplays-v3";
+const CACHE_NAME = "kooraplays-v4";
 const STATIC_ASSETS = [
   "/",
   "/manifest.webmanifest",
@@ -7,7 +7,7 @@ const STATIC_ASSETS = [
   "/icon-512.png"
 ];
 
-const API_CACHE_NAME = "kooraplays-api-v3";
+const API_CACHE_NAME = "kooraplays-api-v4";
 const API_CACHE_DURATION = 60 * 1000;
 
 function isCacheable(url) {

@@ -10,6 +10,12 @@ export interface VoteCounts {
 }
 
 function storageKey(matchId: string) { return `kp_vote_${matchId}`; }
+function safeGet(key: string): string | null {
+  try { return window.localStorage.getItem(key); } catch { return null; }
+}
+function safeSet(key: string, val: string): void {
+  try { window.localStorage.setItem(key, val); } catch { /* private mode */ }
+}
 
 export function usePredictions(matchId: string) {
   const [counts, setCounts] = useState<VoteCounts>({ home: 0, draw: 0, away: 0, total: 0 });
@@ -18,7 +24,7 @@ export function usePredictions(matchId: string) {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    setMyVote((localStorage.getItem(storageKey(matchId)) as PredictVote) ?? null);
+    setMyVote((safeGet(storageKey(matchId)) as PredictVote) ?? null);
   }, [matchId]);
 
   async function fetchCounts() {
@@ -47,7 +53,7 @@ export function usePredictions(matchId: string) {
       if (res.ok) {
         const updated: VoteCounts = await res.json();
         setCounts(updated);
-        localStorage.setItem(storageKey(matchId), vote);
+        safeSet(storageKey(matchId), vote);
         setMyVote(vote);
       }
     } catch { /* ignore */ }

@@ -44,8 +44,19 @@ function rewritePlaylist(text: string, fetchUrl: string): string {
     .join("\n");
 }
 
+function makeHeaders(url: string): Record<string, string> {
+  let origin = "";
+  try { origin = new URL(url).origin; } catch { /* ignore */ }
+  return {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    Accept: "*/*",
+    "Accept-Language": "en-US,en;q=0.9",
+    ...(origin ? { Referer: origin + "/", Origin: origin } : {}),
+  };
+}
+
 export default async function handler(req: Request): Promise<Response> {
-  const { searchParams, host, protocol } = new URL(req.url);
+  const reqUrl = new URL(req.url);
 
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -54,9 +65,9 @@ export default async function handler(req: Request): Promise<Response> {
     });
   }
 
-  const raw = searchParams.get("url");
+  const raw = reqUrl.searchParams.get("url");
   if (!raw) {
-    return new Response(JSON.stringify({ error: "Missing url query param" }), {
+    return new Response(JSON.stringify({ error: "Missing url param" }), {
       status: 400,
       headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
@@ -76,17 +87,6 @@ export default async function handler(req: Request): Promise<Response> {
 
   const cors = { "Access-Control-Allow-Origin": "*", "Cache-Control": "no-cache" };
 
-  function makeHeaders(url: string): Record<string, string> {
-    let origin = "";
-    try { origin = new URL(url).origin; } catch { /* ignore */ }
-    return {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-      Accept: "*/*",
-      "Accept-Language": "en-US,en;q=0.9",
-      ...(origin ? { Referer: origin + "/", Origin: origin } : {}),
-    };
-  }
-
   try {
     let fetchUrl = targetUrl;
     let upstream = await fetch(fetchUrl, {
@@ -95,7 +95,7 @@ export default async function handler(req: Request): Promise<Response> {
     });
 
     if (upstream.status === 429) {
-      return new Response(JSON.stringify({ error: "Upstream rate limited (429)" }), {
+      return new Response(JSON.stringify({ error: "Upstream rate limited" }), {
         status: 429,
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*", "Retry-After": "3" },
       });
@@ -103,7 +103,7 @@ export default async function handler(req: Request): Promise<Response> {
 
     const contentType = upstream.headers.get("content-type") ?? "";
 
-    // If the URL returns an HTML embed page, extract the real m3u8 URL from it
+    // HTML embed page — extract the real m3u8 URL and re-fetch
     if (contentType.includes("text/html")) {
       const html = await upstream.text();
       const m3u8Url = extractM3u8FromHtml(html);
@@ -120,42 +120,35 @@ export default async function handler(req: Request): Promise<Response> {
       });
     }
 
+    const upstreamContentType = upstream.headers.get("content-type") ?? "";
     const isM3u8Url =
-      fetchUrl.includes(".m3u8") ||
-      (upstream.headers.get("content-type") ?? "").includes("mpegurl");
+      fetchUrl.includes(".m3u8") || upstreamContentType.includes("mpegurl");
 
     if (isM3u8Url) {
       const text = await upstream.text();
       if (!isM3u8(text)) {
-        // Unexpected — pass through as-is
         return new Response(text, {
           status: upstream.status,
-          headers: { "Content-Type": upstream.headers.get("content-type") ?? "text/plain", ...cors },
+          headers: { "Content-Type": upstreamContentType || "text/plain", ...cors },
         });
       }
       const rewritten = rewritePlaylist(text, fetchUrl);
-
-      const cacheControl = fetchUrl.includes("master")
-        ? "public, max-age=10, s-maxage=10"
-        : "public, max-age=2, s-maxage=2, stale-while-revalidate=5";
-
       return new Response(rewritten, {
         status: upstream.status,
-        headers: {
-          "Content-Type": "application/vnd.apple.mpegurl",
-          "Access-Control-Allow-Origin": "*",
-          "Cache-Control": cacheControl,
-        },
+        headers: { "Content-Type": "application/vnd.apple.mpegurl", ...cors },
       });
     }
 
-    // Binary segments (.ts / .m4s / .key etc.) — stream through directly
-    return new Response(upstream.body, {
+    // Binary segments (.ts / .m4s / .key etc.)
+    // Read as ArrayBuffer to avoid null body issues on some runtimes
+    const buf = await upstream.arrayBuffer();
+    return new Response(buf, {
       status: upstream.status,
       headers: {
-        "Content-Type": contentType || "video/mp2t",
+        "Content-Type": upstreamContentType || "video/mp2t",
         "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=31536000, immutable",
+        // No immutable cache — live segments may share names with different content
+        "Cache-Control": "no-cache",
       },
     });
   } catch (err) {
