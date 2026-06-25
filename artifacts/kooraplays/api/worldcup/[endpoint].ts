@@ -1,29 +1,27 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
+export const config = { runtime: "edge" };
 
 const WC_BASE = "https://worldcup26.ir/get";
 const ALLOWED = new Set(["games", "teams", "groups", "stadiums"]);
 
-export default async function handler(
-  req: IncomingMessage & { query?: Record<string, string | string[]> },
-  res: ServerResponse
-) {
-  const url = new URL(req.url ?? "/", `https://${(req as any).headers.host}`);
+export default async function handler(request: Request): Promise<Response> {
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "GET, OPTIONS" },
+    });
+  }
+
+  const url = new URL(request.url);
   const parts = url.pathname.split("/").filter(Boolean);
   const endpoint = parts[parts.length - 1];
 
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-
-  if (req.method === "OPTIONS") {
-    res.writeHead(204);
-    res.end();
-    return;
-  }
+  const cors = { "Access-Control-Allow-Origin": "*" };
 
   if (!endpoint || !ALLOWED.has(endpoint)) {
-    res.writeHead(404, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: "Not found" }));
-    return;
+    return new Response(JSON.stringify({ error: "Not found" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json", ...cors },
+    });
   }
 
   try {
@@ -32,19 +30,22 @@ export default async function handler(
       signal: AbortSignal.timeout(20_000),
     });
 
-    if (!upstream.ok) {
-      throw new Error(`Upstream HTTP ${upstream.status}`);
-    }
+    if (!upstream.ok) throw new Error(`Upstream HTTP ${upstream.status}`);
 
     const data = await upstream.text();
-    res.writeHead(200, {
-      "Content-Type": "application/json",
-      "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+    return new Response(data, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+        ...cors,
+      },
     });
-    res.end(data);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
-    res.writeHead(502, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ error: msg }));
+    return new Response(JSON.stringify({ error: msg }), {
+      status: 502,
+      headers: { "Content-Type": "application/json", ...cors },
+    });
   }
 }

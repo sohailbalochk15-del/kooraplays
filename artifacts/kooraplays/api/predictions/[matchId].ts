@@ -1,64 +1,51 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
+export const config = { runtime: "edge" };
 
-type Vote = "home" | "draw" | "away";
-interface VoteCounts { home: number; draw: number; away: number; total: number }
+// NOTE: Edge functions are stateless — votes reset on each cold start.
+// For persistent predictions, connect to a database (KV, Supabase, etc.).
+const votes = new Map<string, { home: number; draw: number; away: number; total: number }>();
 
-const votes = new Map<string, VoteCounts>();
-
-function getVotes(matchId: string): VoteCounts {
-  if (!votes.has(matchId)) {
-    votes.set(matchId, { home: 0, draw: 0, away: 0, total: 0 });
-  }
+function getVotes(matchId: string) {
+  if (!votes.has(matchId)) votes.set(matchId, { home: 0, draw: 0, away: 0, total: 0 });
   return votes.get(matchId)!;
 }
 
-export default async function handler(
-  req: IncomingMessage & { query?: Record<string, string | string[]> },
-  res: ServerResponse
-) {
-  const url = new URL(req.url ?? "/", `https://${(req as any).headers.host}`);
+export default async function handler(request: Request): Promise<Response> {
+  const url = new URL(request.url);
   const parts = url.pathname.split("/").filter(Boolean);
   const matchId = decodeURIComponent(parts[parts.length - 1]);
 
-  res.setHeader("Content-Type", "application/json");
-  res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  const cors = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Content-Type": "application/json",
+  };
 
-  if (req.method === "OPTIONS") {
-    res.writeHead(204);
-    res.end();
-    return;
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: cors });
   }
 
-  if (req.method === "GET") {
-    res.writeHead(200);
-    res.end(JSON.stringify(getVotes(matchId)));
-    return;
+  if (request.method === "GET") {
+    return new Response(JSON.stringify(getVotes(matchId)), { status: 200, headers: cors });
   }
 
-  if (req.method === "POST") {
-    let body = "";
-    for await (const chunk of req) body += String(chunk);
+  if (request.method === "POST") {
     try {
-      const parsed = JSON.parse(body) as { vote?: string };
-      const valid: Vote[] = ["home", "draw", "away"];
-      if (!parsed.vote || !valid.includes(parsed.vote as Vote)) {
-        res.writeHead(400);
-        res.end(JSON.stringify({ error: "vote must be 'home', 'draw', or 'away'" }));
-        return;
+      const body = await request.json() as { vote?: string };
+      const valid = ["home", "draw", "away"] as const;
+      type Vote = typeof valid[number];
+      if (!body.vote || !valid.includes(body.vote as Vote)) {
+        return new Response(JSON.stringify({ error: "vote must be 'home', 'draw', or 'away'" }), {
+          status: 400, headers: cors,
+        });
       }
       const v = getVotes(matchId);
-      v[parsed.vote as Vote]++;
+      v[body.vote as Vote]++;
       v.total++;
-      res.writeHead(200);
-      res.end(JSON.stringify(v));
+      return new Response(JSON.stringify(v), { status: 200, headers: cors });
     } catch {
-      res.writeHead(400);
-      res.end(JSON.stringify({ error: "Invalid body" }));
+      return new Response(JSON.stringify({ error: "Invalid body" }), { status: 400, headers: cors });
     }
-    return;
   }
 
-  res.writeHead(405);
-  res.end(JSON.stringify({ error: "Method not allowed" }));
+  return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405, headers: cors });
 }

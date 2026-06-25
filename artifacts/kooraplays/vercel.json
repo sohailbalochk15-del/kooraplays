@@ -3,11 +3,5 @@
   "outputDirectory": "dist/public",
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ],
-  "functions": {
-    "api/**/*.ts": {
-      "memory": 512,
-      "maxDuration": 30
-    }
-  }
+  ]
 }
