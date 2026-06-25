@@ -64,6 +64,17 @@ const VAST_TAG = ""; // Set to your VAST tag URL to enable pre-roll ads
 // ─── Types ──────────────────────────────────────────────────────────────────
 type PlayerState = "idle" | "ad" | "stream" | "error";
 type ActiveChannel = 1 | 2;
+type PlayerMode = "hls" | "embed" | "none";
+
+/** Decide how to render a stream URL:
+ *  - "hls"   — direct .m3u8 → use Hls.js player + our proxy
+ *  - "embed" — any other URL (embed page, iframe player) → render in <iframe>
+ *  - "none"  — empty string → show placeholder
+ */
+function getPlayerMode(url: string): PlayerMode {
+  if (!url) return "none";
+  return url.toLowerCase().includes(".m3u8") ? "hls" : "embed";
+}
 
 interface ChannelData {
   stream_url: string;
@@ -572,6 +583,48 @@ function HlsPlayer({ src, title, visible }: HlsPlayerProps) {
   );
 }
 
+// ─── IframePlayer ────────────────────────────────────────────────────────────
+// Used for embed-page URLs (non-.m3u8) — renders directly in the browser so
+// the browser's own network stack handles the stream (no proxy needed, no CDN
+// IP-block issues). Works with JavaScript-rendered embed pages.
+
+interface IframePlayerProps {
+  src: string;
+  title: string;
+  visible: boolean;
+}
+
+function IframePlayer({ src, title, visible }: IframePlayerProps) {
+  return (
+    <div
+      className="absolute inset-0 bg-black"
+      style={{
+        zIndex:        visible ? 10 : 0,
+        pointerEvents: visible ? "auto" : "none",
+        visibility:    visible ? "visible" : "hidden",
+      }}
+    >
+      {src ? (
+        <iframe
+          // Keyed on src so a new iframe is created if the URL changes
+          key={src}
+          src={src}
+          title={title}
+          className="w-full h-full border-0"
+          allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
+          allowFullScreen
+          referrerPolicy="no-referrer-when-downgrade"
+          scrolling="no"
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary/60" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Live page ───────────────────────────────────────────────────────────────
 
 export default function Live() {
@@ -722,7 +775,7 @@ export default function Live() {
         </div>
       </div>
 
-      {/* ── Video area — both HLS players always mounted ── */}
+      {/* ── Video area ── */}
       <div className="flex-1 min-h-0 relative bg-black">
         {loadingMeta ? (
           /* Loading spinner while Supabase data is being fetched */
@@ -732,29 +785,46 @@ export default function Live() {
         ) : (
           <>
             {/*
-             * Channel 1 player — always mounted; visible when activeChannel === 1
-             * Uses a stable key so it never remounts on channel switch.
-             * The key only changes when the src URL itself changes (Supabase update),
-             * which resets the player to idle state for the new URL.
+             * Channel 1 — always mounted; visible when activeChannel === 1.
+             * Renders as HlsPlayer for direct .m3u8 URLs, IframePlayer for
+             * embed-page URLs (most football streaming sites). Key changes
+             * only when the URL itself changes (Supabase update).
              */}
-            <HlsPlayer
-              key={`ch1-${channels[0].stream_url}`}
-              src={channels[0].stream_url}
-              title={channels[0].title}
-              visible={activeChannel === 1}
-            />
+            {getPlayerMode(channels[0].stream_url) === "hls" ? (
+              <HlsPlayer
+                key={`ch1-hls-${channels[0].stream_url}`}
+                src={channels[0].stream_url}
+                title={channels[0].title}
+                visible={activeChannel === 1}
+              />
+            ) : (
+              <IframePlayer
+                key={`ch1-embed-${channels[0].stream_url}`}
+                src={channels[0].stream_url}
+                title={channels[0].title}
+                visible={activeChannel === 1}
+              />
+            )}
 
             {/*
-             * Channel 2 player — always mounted; visible when activeChannel === 2
-             * Completely independent Hls instance and <video> element.
-             * Chrome's MediaSource for each channel is fully isolated.
+             * Channel 2 — always mounted; visible when activeChannel === 2.
+             * Completely independent player instance from Channel 1.
              */}
-            <HlsPlayer
-              key={`ch2-${channels[1].stream_url}`}
-              src={channels[1].stream_url}
-              title={channels[1].title}
-              visible={activeChannel === 2}
-            />
+            {getPlayerMode(channels[1].stream_url) === "hls" ? (
+              <HlsPlayer
+                key={`ch2-hls-${channels[1].stream_url}`}
+                src={channels[1].stream_url}
+                title={channels[1].title}
+                visible={activeChannel === 2}
+              />
+            ) : (
+              <IframePlayer
+                key={`ch2-embed-${channels[1].stream_url}`}
+                src={channels[1].stream_url}
+                title={channels[1].title}
+                visible={activeChannel === 2}
+              />
+            )}
 
             {/* Fallback: no stream URL configured for active channel */}
             {!channels[activeChannel - 1].stream_url && (
