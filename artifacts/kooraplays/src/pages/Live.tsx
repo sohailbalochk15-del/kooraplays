@@ -135,11 +135,18 @@ function HlsPlayer({ src, title, visible }: HlsPlayerProps) {
   const { t } = useLang();
 
   const [state,        setState]        = useState<PlayerState>("idle");
-  const [muted,        setMuted]        = useState(false);
+  const [muted,        setMuted]        = useState<boolean>(() => {
+    try { return localStorage.getItem("kp_muted") === "1"; } catch { return false; }
+  });
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Proxied URL — the proxy handles CORS and rewrites segment URLs
   const proxied = toProxyUrl(src);
+
+  // Keep a ref to muted so startStream always reads the latest value without
+  // needing to be in its dependency array (avoids stale closure issues).
+  const mutedRef = useRef(muted);
+  useEffect(() => { mutedRef.current = muted; }, [muted]);
 
   /**
    * Fully tears down the current HLS session.
@@ -222,13 +229,16 @@ function HlsPlayer({ src, title, visible }: HlsPlayerProps) {
       hls.attachMedia(video);
       hls.loadSource(proxied);
 
-      // Auto-play once manifest is parsed; fall back to muted if autoplay blocked
+      // Auto-play once manifest is parsed.
+      // Respect the user's saved mute preference; fall back to muted if
+      // the browser blocks unmuted autoplay (e.g. on first-ever visit).
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        video.muted = false;
+        video.muted = mutedRef.current;
         video.play().catch(() => {
-          // Autoplay policy blocked unmuted play — retry muted
+          // Autoplay policy blocked — retry muted
           video.muted = true;
           setMuted(true);
+          try { localStorage.setItem("kp_muted", "1"); } catch { /* private mode */ }
           video.play().catch(() => {});
         });
       });
@@ -410,8 +420,10 @@ function HlsPlayer({ src, title, visible }: HlsPlayerProps) {
 
   const toggleMute = () => {
     if (videoRef.current) {
-      videoRef.current.muted = !muted;
-      setMuted(!muted);
+      const next = !muted;
+      videoRef.current.muted = next;
+      setMuted(next);
+      try { localStorage.setItem("kp_muted", next ? "1" : "0"); } catch { /* private mode */ }
     }
   };
 
@@ -506,12 +518,13 @@ function HlsPlayer({ src, title, visible }: HlsPlayerProps) {
       )}
 
       {/* The video element — hls.js attaches its MediaSource here */}
+      {/* NOTE: muted is controlled via videoRef.current.muted directly to avoid
+          React's muted-attribute reconciliation conflicting with our autoplay logic. */}
       <video
         ref={videoRef}
         className="absolute inset-0 w-full h-full object-contain"
         title={title}
         playsInline
-        muted={muted}
         // Show native controls on iOS (hls.js uses native; native controls required)
         controls={isIOS && state === "stream"}
         data-testid="video-hls"
