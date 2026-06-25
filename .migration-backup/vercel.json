@@ -1,0 +1,23 @@
+{
+  "buildCommand": "pnpm --filter @workspace/kooraplays run build",
+  "outputDirectory": "artifacts/kooraplays/dist/public",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "framework": null,
+  "env": {
+    "VITE_SUPABASE_URL": "https://lispnnpwqvvxzcdsjacm.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "sb_publishable_RGV4bPrYnjqhJuARTv3EYQ_di3394EO"
+  },
+  "rewrites": [
+    { "source": "/api/worldcup/:endpoint", "destination": "/api/worldcup/[endpoint]" },
+    { "source": "/api/predictions/:matchId", "destination": "/api/predictions/[matchId]" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" }
+      ]
+    }
+  ]
+}
