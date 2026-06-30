@@ -41,7 +41,6 @@ function ScoreDigit({ value }: { value: number }) {
 
 export function MatchCard({ match, liveIndex }: { match: MatchData; liveIndex?: 1 | 2 }) {
   const { t, lang } = useLang();
-  const [, navigate] = useLocation();
   const isLive     = match.status === "LIVE";
   const isHalfTime = match.status === "HALFTIME";
   const isFinished = match.status === "FINISHED";
