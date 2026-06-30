@@ -4,6 +4,7 @@ import { LiveDot } from "./LiveDot";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useLang } from "@/lib/i18n";
+import { LIVE_URL } from "@/App";
 
 export function Navbar() {
   const [location] = useLocation();
@@ -58,20 +59,15 @@ export function Navbar() {
               {lang === "en" ? "\u0639\u0631\u0628\u064a" : "EN"}
             </button>
 
-            <Link href="/live" className="hidden md:block">
+            <a href={LIVE_URL} target="_blank" rel="noopener noreferrer" className="hidden md:block">
               <Button
-                variant={location === "/live" ? "default" : "outline"}
-                className={cn(
-                  "gap-2 font-bold",
-                  location === "/live"
-                    ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    : "border-destructive text-destructive hover:bg-destructive/10"
-                )}
+                variant="outline"
+                className="gap-2 font-bold border-destructive text-destructive hover:bg-destructive/10"
               >
                 <LiveDot />
                 {t.liveTV}
               </Button>
-            </Link>
+            </a>
 
             <button
               onClick={toggleLang}
@@ -81,21 +77,16 @@ export function Navbar() {
               {lang === "en" ? "\u0639" : "EN"}
             </button>
 
-            <Link href="/live" className="flex md:hidden">
+            <a href={LIVE_URL} target="_blank" rel="noopener noreferrer" className="flex md:hidden">
               <Button
                 size="sm"
-                variant={location === "/live" ? "default" : "outline"}
-                className={cn(
-                  "gap-1.5 font-bold text-xs h-8 px-3",
-                  location === "/live"
-                    ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    : "border-destructive text-destructive hover:bg-destructive/10"
-                )}
+                variant="outline"
+                className="gap-1.5 font-bold text-xs h-8 px-3 border-destructive text-destructive hover:bg-destructive/10"
               >
                 <LiveDot className="h-1.5 w-1.5" />
                 {t.live}
               </Button>
-            </Link>
+            </a>
           </div>
         </div>
       </nav>
@@ -119,22 +110,18 @@ export function Navbar() {
             );
           })}
 
-          <Link
-            href="/live"
-            className={cn(
-              "flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-colors",
-              location === "/live" ? "text-destructive" : "text-muted-foreground"
-            )}
+          <a
+            href={LIVE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-colors text-muted-foreground"
           >
-            <div className={cn(
-              "relative flex items-center justify-center rounded-full w-8 h-8",
-              location === "/live" ? "bg-destructive/15" : ""
-            )}>
+            <div className="relative flex items-center justify-center rounded-full w-8 h-8">
               <Tv className="h-5 w-5" />
               <LiveDot className="absolute -top-0.5 -right-0.5 h-2 w-2" />
             </div>
             <span>{t.liveTV}</span>
-          </Link>
+          </a>
         </div>
         <div className="h-[env(safe-area-inset-bottom)]" />
       </div>

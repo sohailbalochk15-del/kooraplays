@@ -4,6 +4,7 @@ import { SkeletonCard } from "@/components/SkeletonCard";
 import { Button } from "@/components/ui/button";
 import { Trophy, ArrowRight, PlayCircle, Calendar } from "lucide-react";
 import { Link } from "wouter";
+import { LIVE_URL } from "@/App";
 import { motion } from "framer-motion";
 import { isToday, parseISO, isFuture, format } from "date-fns";
 import { useLang } from "@/lib/i18n";
@@ -72,7 +73,7 @@ export default function Home() {
             {t.heroDesc}
           </p>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-2 md:mt-4 w-full sm:w-auto">
-            <Link href="/live" className="w-full sm:w-auto">
+            <a href={LIVE_URL} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
               <Button
                 size="lg"
                 className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground
@@ -81,7 +82,7 @@ export default function Home() {
                 <PlayCircle className="me-2 h-5 w-5" />
                 {t.startWatching}
               </Button>
-            </Link>
+            </a>
             <Link href="/schedule" className="w-full sm:w-auto">
               <Button
                 variant="outline"

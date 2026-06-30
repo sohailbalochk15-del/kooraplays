@@ -7,9 +7,11 @@ import { PredictCard } from "./PredictCard";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useLang } from "@/lib/i18n";
-import { useLocation } from "wouter";
 import { Tv } from "lucide-react";
 import type { MatchData } from "@/api/worldcup";
+import { LIVE_URL } from "@/App";
+
+
 
 export type { MatchData };
 
@@ -149,8 +151,11 @@ export function MatchCard({ match, liveIndex }: { match: MatchData; liveIndex?: 
 
         {isWatchable && (
           <div className="px-4 pb-3">
-            <button
-              onClick={(e) => { e.stopPropagation(); navigate(`/live?m=${liveIndex ?? 1}`); }}
+            <a
+              href={LIVE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
               className={cn(
                 "w-full flex items-center justify-center gap-2 rounded-lg active:scale-95 transition-all py-2.5 text-white text-sm font-bold shadow-md touch-manipulation",
                 isLive
@@ -163,7 +168,7 @@ export function MatchCard({ match, liveIndex }: { match: MatchData; liveIndex?: 
                 ? <><LiveDot className="h-2 w-2" /> {t.live} — {t.watchNow}</>
                 : <>{t.halfTime} — {t.watchNow}</>
               }
-            </button>
+            </a>
           </div>
         )}
         {isWatchable && (

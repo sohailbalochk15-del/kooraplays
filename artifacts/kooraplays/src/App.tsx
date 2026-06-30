@@ -9,12 +9,24 @@ import { LangProvider } from "@/lib/i18n";
 import Home from "@/pages/Home";
 import Schedule from "@/pages/Schedule";
 import Standings from "@/pages/Standings";
-import Live from "@/pages/Live";
 import Bracket from "@/pages/Bracket";
 import VotePage from "@/pages/Vote";
 import NotFound from "@/pages/not-found";
 
+export const LIVE_URL = "https://www.finx24.com/p/watch-live.html";
+
 const queryClient = new QueryClient();
+
+function LiveRedirect() {
+  useEffect(() => {
+    window.location.href = LIVE_URL;
+  }, []);
+  return (
+    <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+      <p className="text-muted-foreground animate-pulse">Redirecting to live stream…</p>
+    </div>
+  );
+}
 
 function Router() {
   return (
@@ -22,7 +34,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/schedule" component={Schedule} />
       <Route path="/standings" component={Standings} />
-      <Route path="/live" component={Live} />
+      <Route path="/live" component={LiveRedirect} />
       <Route path="/bracket" component={Bracket} />
       <Route path="/vote" component={VotePage} />
       <Route component={NotFound} />
