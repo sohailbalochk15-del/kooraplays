@@ -214,12 +214,15 @@ const LangContext = createContext<LangContextValue>({
   isRtl: true,
 });
 
+function getSavedLang(): Lang | null {
+  try { return localStorage.getItem("kp_lang") as Lang | null; } catch { return null; }
+}
+
 export function LangProvider({ children }: { children: ReactNode }) {
-  const stored = (typeof localStorage !== "undefined" ? localStorage.getItem("kp_lang") : null) as Lang | null;
-  const [lang, setLangState] = useState<Lang>(stored ?? "ar");
+  const [lang, setLangState] = useState<Lang>(() => getSavedLang() ?? "ar");
 
   const setLang = (l: Lang) => {
-    localStorage.setItem("kp_lang", l);
+    try { localStorage.setItem("kp_lang", l); } catch { /* private/incognito mode */ }
     setLangState(l);
   };
 

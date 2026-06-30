@@ -26,18 +26,21 @@ async function getCounts(matchId: string): Promise<{ home: number; draw: number;
   if (!SUPABASE_URL || !SUPABASE_KEY) return empty;
 
   try {
+    // Fetch all individual prediction rows and count in JS.
+    // Using `select=outcome,count` (PostgREST column selection) was wrong because
+    // "count" is not a column — it returned null for every row, so all counts were 0.
     const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/match_predictions?match_id=eq.${encodeURIComponent(matchId)}&select=outcome,count`,
+      `${SUPABASE_URL}/rest/v1/match_predictions?match_id=eq.${encodeURIComponent(matchId)}&select=outcome`,
       { headers: sbHeaders() }
     );
     if (!res.ok) return empty;
 
-    const rows: { outcome: string; count: number }[] = await res.json();
+    const rows: { outcome: string }[] = await res.json();
     const result = { ...empty };
     for (const row of rows) {
-      if (row.outcome === "home") result.home = row.count;
-      else if (row.outcome === "draw") result.draw = row.count;
-      else if (row.outcome === "away") result.away = row.count;
+      if (row.outcome === "home")      result.home++;
+      else if (row.outcome === "draw") result.draw++;
+      else if (row.outcome === "away") result.away++;
     }
     result.total = result.home + result.draw + result.away;
     return result;
