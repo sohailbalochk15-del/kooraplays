@@ -67,19 +67,16 @@ type ActiveChannel = 1 | 2;
 type PlayerMode = "hls" | "embed" | "none";
 
 /** Decide how to render a stream URL:
- *  - "hls"   — URL whose *path* ends with .m3u8 → use Hls.js player + our proxy
- *  - "embed" — any other URL (embed page, iframe player, stream.php?file=…) → <iframe>
+ *  - "hls"   — URL containing ".m3u8" anywhere (path or query) → Hls.js player
+ *  - "embed" — any other URL → render in <iframe>
  *  - "none"  — empty → show placeholder
  *
- * NOTE: checks the URL pathname only, not query params, so a URL like
- * "stream.php?channel=x&file=stream.m3u8" is correctly treated as "embed".
+ * Checks the full URL string so URLs like "stream.php?file=stream.m3u8"
+ * are correctly played by the HLS player, same as m3u8-player.net does.
  */
 function getPlayerMode(url: string): PlayerMode {
   if (!url) return "none";
-  try {
-    const pathname = new URL(url).pathname.toLowerCase();
-    if (pathname.endsWith(".m3u8")) return "hls";
-  } catch { /* fall through */ }
+  if (url.toLowerCase().includes(".m3u8")) return "hls";
   return "embed";
 }
 
@@ -243,13 +240,27 @@ function HlsPlayer({ src, title, visible }: HlsPlayerProps) {
 
       hlsRef.current = hls;
 
-      // Attach to the video element BEFORE loading the source
+      /**
+       * Load strategy — mirrors how m3u8-player.net works:
+       *   1. Try the URL directly (no proxy) — works when the CDN sends CORS headers.
+       *   2. On the first fatal MANIFEST_LOAD_ERROR (CORS block), silently retry
+       *      through our proxy which adds the missing CORS headers.
+       *   3. After that, normal retry / error recovery applies.
+       */
+      let usedProxy    = false;
+      let corsRetried  = false;
+
+      const loadSource = (url: string) => {
+        hls.detachMedia();
+        hls.attachMedia(video);
+        hls.loadSource(url);
+      };
+
+      // Start with direct URL (no proxy)
       hls.attachMedia(video);
-      hls.loadSource(proxied);
+      hls.loadSource(src);
 
       // Auto-play once manifest is parsed.
-      // Respect the user's saved mute preference; fall back to muted if
-      // the browser blocks unmuted autoplay (e.g. on first-ever visit).
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         video.muted = mutedRef.current;
         video.play().catch(() => {
@@ -279,6 +290,13 @@ function HlsPlayer({ src, title, visible }: HlsPlayerProps) {
         }
 
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          // First network error on direct URL → silently retry via proxy (CORS fix)
+          if (!corsRetried && !usedProxy) {
+            corsRetried = true;
+            usedProxy   = true;
+            loadSource(proxied);
+            return;
+          }
           if (networkRetries < MAX_RETRIES) {
             networkRetries++;
             // Exponential back-off: 1 s, 2 s, 3 s …
@@ -311,10 +329,15 @@ function HlsPlayer({ src, title, visible }: HlsPlayerProps) {
 
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
       // ── Native HLS fallback (Safari / iOS) ──
-      // Safari has built-in HLS support; set src directly
-      video.src = proxied;
+      // Safari has built-in HLS support — try direct first, proxy if it errors
+      video.src = src;
+      video.addEventListener("error", () => {
+        // Likely a CORS issue — retry via proxy
+        video.src = proxied;
+        video.load();
+        video.play().catch(() => {});
+      }, { once: true });
       video.addEventListener("loadedmetadata", () => { video.play().catch(() => {}); }, { once: true });
-      video.addEventListener("error",          () => setState("error"),              { once: true });
     } else {
       // Neither hls.js nor native HLS available
       setState("error");
