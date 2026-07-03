@@ -13,6 +13,7 @@ import Bracket from "@/pages/Bracket";
 import VotePage from "@/pages/Vote";
 import MatchDetail from "@/pages/MatchDetail";
 import Live from "@/pages/Live";
+import Admin from "@/pages/Admin";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/live" component={Live} />
       <Route path="/bracket" component={Bracket} />
       <Route path="/vote" component={VotePage} />
+      <Route path="/admin" component={Admin} />
       <Route component={NotFound} />
     </Switch>
   );
