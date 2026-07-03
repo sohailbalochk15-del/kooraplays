@@ -62,18 +62,27 @@ interface ImaNamespace {
 const VAST_TAG = ""; // Set to your VAST tag URL to enable pre-roll ads
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-type PlayerState = "idle" | "ad" | "stream" | "error";
+type PlayerState = "idle" | "ad" | "stream" | "error" | "expired";
 type ActiveChannel = 1 | 2;
 type PlayerMode = "hls" | "embed" | "none";
 
 /** Decide how to render a stream URL:
  *  - "hls"   — direct .m3u8 → use Hls.js player + our proxy
  *  - "embed" — any other URL (embed page, iframe player) → render in <iframe>
- *  - "none"  — empty string → show placeholder
+ *  - "none"  — empty/unsupported → show placeholder
  */
 function getPlayerMode(url: string): PlayerMode {
   if (!url) return "none";
-  return url.toLowerCase().includes(".m3u8") ? "hls" : "embed";
+  const lower = url.toLowerCase();
+  // Twitch raw CDN token URLs (ttvnw.net) cannot be played in an iframe and
+  // expire within minutes — show "none" so the user sees the helpful error state.
+  if (lower.includes("ttvnw.net")) return "none";
+  return lower.includes(".m3u8") ? "hls" : "embed";
+}
+
+/** Returns true if the URL is a raw Twitch CDN token that has likely expired */
+function isTwitchToken(url: string): boolean {
+  return url.toLowerCase().includes("ttvnw.net");
 }
 
 interface ChannelData {
@@ -268,6 +277,13 @@ function HlsPlayer({ src, title, visible }: HlsPlayerProps) {
           ) {
             video.currentTime += 0.1;
           }
+          return;
+        }
+
+        // 403 Forbidden = stream token expired or geo-blocked — no point retrying
+        const httpStatus = (data.response as { code?: number } | undefined)?.code;
+        if (httpStatus === 403 || httpStatus === 401) {
+          setState("expired");
           return;
         }
 
@@ -509,13 +525,19 @@ function HlsPlayer({ src, title, visible }: HlsPlayerProps) {
       )}
 
       {/* Error state */}
-      {state === "error" && (
+      {(state === "error" || state === "expired") && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-4 bg-black px-6 text-center">
           <div className="rounded-full bg-destructive/20 p-4">
             <Tv className="h-8 w-8 text-destructive" />
           </div>
-          <p className="text-sm font-semibold text-destructive mb-1">{t.streamUnavailable}</p>
-          <p className="text-xs text-muted-foreground">{t.broadcastEnded}</p>
+          <p className="text-sm font-semibold text-destructive mb-1">
+            {state === "expired" ? "Stream Token Expired" : t.streamUnavailable}
+          </p>
+          <p className="text-xs text-muted-foreground max-w-xs">
+            {state === "expired"
+              ? "Update the stream URL in Supabase. Use a channel URL like twitch.tv/channel_name instead of a raw .m3u8 token."
+              : t.broadcastEnded}
+          </p>
           {/* Retry button */}
           <button
             onClick={() => { setState("idle"); }}
@@ -583,6 +605,46 @@ function HlsPlayer({ src, title, visible }: HlsPlayerProps) {
   );
 }
 
+// ─── Twitch URL helpers ──────────────────────────────────────────────────────
+
+/**
+ * Twitch embed player requires a `parent` query param set to the page's hostname.
+ * Without it, the embed shows "Refused to connect" in the browser.
+ *
+ * This function handles three Twitch URL formats:
+ *   1. https://player.twitch.tv/?channel=X           → already an embed, add parent
+ *   2. https://www.twitch.tv/channel_name            → convert to embed URL
+ *   3. https://euc*.playlist.ttvnw.net/...m3u8       → raw HLS token (expired fast)
+ *      For this case we can't do anything — warn user to use the embed URL instead.
+ */
+function prepareSrc(url: string): string {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    const parent = typeof window !== "undefined" ? window.location.hostname : "localhost";
+
+    // Already a Twitch embed player URL
+    if (u.hostname === "player.twitch.tv") {
+      if (!u.searchParams.get("parent")) {
+        u.searchParams.set("parent", parent);
+      }
+      if (!u.searchParams.get("autoplay")) {
+        u.searchParams.set("autoplay", "true");
+      }
+      return u.toString();
+    }
+
+    // Direct twitch.tv channel URL → convert to embed
+    if (u.hostname === "www.twitch.tv" || u.hostname === "twitch.tv") {
+      const channel = u.pathname.replace(/^\//, "").split("/")[0];
+      if (channel) {
+        return `https://player.twitch.tv/?channel=${encodeURIComponent(channel)}&parent=${encodeURIComponent(parent)}&autoplay=true`;
+      }
+    }
+  } catch { /* not a valid URL — return as-is */ }
+  return url;
+}
+
 // ─── IframePlayer ────────────────────────────────────────────────────────────
 // Used for embed-page URLs (non-.m3u8) — renders directly in the browser so
 // the browser's own network stack handles the stream (no proxy needed, no CDN
@@ -595,6 +657,8 @@ interface IframePlayerProps {
 }
 
 function IframePlayer({ src, title, visible }: IframePlayerProps) {
+  const finalSrc = prepareSrc(src);
+
   return (
     <div
       className="absolute inset-0 bg-black"
@@ -614,9 +678,9 @@ function IframePlayer({ src, title, visible }: IframePlayerProps) {
        * fresh. The channel-switcher click counts as a user gesture, so
        * the browser permits unmuted autoplay for the new iframe.
        */}
-      {visible && src && (
+      {visible && finalSrc && (
         <iframe
-          src={src}
+          src={finalSrc}
           title={title}
           className="w-full h-full border-0"
           allow="autoplay; fullscreen; encrypted-media; picture-in-picture"
@@ -833,13 +897,25 @@ export default function Live() {
             )}
 
             {/* Fallback: no stream URL configured for active channel */}
-            {!channels[activeChannel - 1].stream_url && (
+            {getPlayerMode(channels[activeChannel - 1].stream_url) === "none" && (
               <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 px-6 text-center">
-                <div className="rounded-full bg-primary/10 p-5">
-                  <Tv className="h-10 w-10 text-primary" />
+                <div className={`rounded-full p-5 ${isTwitchToken(channels[activeChannel - 1].stream_url) ? "bg-destructive/10" : "bg-primary/10"}`}>
+                  <Tv className={`h-10 w-10 ${isTwitchToken(channels[activeChannel - 1].stream_url) ? "text-destructive" : "text-primary"}`} />
                 </div>
-                <p className="text-sm font-semibold text-muted-foreground">{t.noStream}</p>
-                <p className="text-xs text-muted-foreground/60">{t.noStreamDesc}</p>
+                {isTwitchToken(channels[activeChannel - 1].stream_url) ? (
+                  <>
+                    <p className="text-sm font-semibold text-destructive">Stream Token Expired</p>
+                    <p className="text-xs text-muted-foreground/80 max-w-xs">
+                      Update the stream URL in Supabase to a channel URL, e.g.<br />
+                      <code className="text-primary/80">https://www.twitch.tv/your_channel</code>
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-muted-foreground">{t.noStream}</p>
+                    <p className="text-xs text-muted-foreground/60">{t.noStreamDesc}</p>
+                  </>
+                )}
               </div>
             )}
           </>
