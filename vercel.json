@@ -1,0 +1,42 @@
+{
+  "version": 2,
+  "buildCommand": "pnpm --filter @workspace/kooraplays run build",
+  "outputDirectory": "artifacts/kooraplays/dist/public",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "framework": null,
+  "env": {
+    "VITE_SUPABASE_URL": "https://lispnnpwqvvxzcdsjacm.supabase.co",
+    "VITE_SUPABASE_ANON_KEY": "sb_publishable_RGV4bPrYnjqhJuARTv3EYQ_di3394EO"
+  },
+  "build": {
+    "env": {
+      "VITE_SUPABASE_URL": "https://lispnnpwqvvxzcdsjacm.supabase.co",
+      "VITE_SUPABASE_ANON_KEY": "sb_publishable_RGV4bPrYnjqhJuARTv3EYQ_di3394EO"
+    }
+  },
+  "headers": [
+    {
+      "source": "/index.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Pragma", "value": "no-cache" }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ],
+  "rewrites": [
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}

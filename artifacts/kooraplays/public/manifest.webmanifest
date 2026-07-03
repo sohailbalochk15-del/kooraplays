@@ -1,0 +1,58 @@
+{
+  "name": "KooraPlays — FIFA World Cup 2026",
+  "short_name": "KooraPlays",
+  "description": "Watch FIFA World Cup 2026 live streams, real-time scores, standings, and match schedules.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0a0a",
+  "theme_color": "#22c55e",
+  "lang": "ar",
+  "dir": "rtl",
+  "categories": ["sports", "entertainment"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/opengraph.jpg",
+      "sizes": "1200x630",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "KooraPlays Home"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "الجدول",
+      "short_name": "الجدول",
+      "description": "جدول المباريات",
+      "url": "/schedule",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "الترتيب",
+      "short_name": "الترتيب",
+      "description": "ترتيب المجموعات",
+      "url": "/standings",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

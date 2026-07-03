@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://kooraplays-kooraplays-git-main-sohailbalochk15-5610s-projects.vercel.app/sitemap.xml

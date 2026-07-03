@@ -1,0 +1,34 @@
+kind = "web"
+previewPath = "/"
+title = "KooraPlays"
+version = "1.0.0"
+id = "artifacts/kooraplays"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25621
+
+[services.development]
+run = "pnpm --filter @workspace/kooraplays run dev"
+
+[services.production.build]
+args = ["pnpm", "--filter", "@workspace/kooraplays", "run", "build"]
+
+[services.production.build.env]
+NODE_ENV = "production"
+
+[services.production.run]
+args = ["node", "artifacts/kooraplays/server.mjs"]
+
+[services.production.run.env]
+NODE_ENV = "production"
+
+[services.env]
+PORT = "25621"
+BASE_PATH = "/"
