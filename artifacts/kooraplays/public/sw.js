@@ -1,4 +1,4 @@
-const CACHE_NAME = "kooraplays-v4";
+const CACHE_NAME = "kooraplays-v5";
 const STATIC_ASSETS = [
   "/",
   "/manifest.webmanifest",
@@ -6,12 +6,23 @@ const STATIC_ASSETS = [
   "/icon-192.png",
   "/icon-512.png"
 ];
-
-const API_CACHE_NAME = "kooraplays-api-v4";
+const API_CACHE_NAME = "kooraplays-api-v5";
 const API_CACHE_DURATION = 60 * 1000;
+
+// File extensions used for HLS streaming - these must NEVER be cached
+// by the service worker. Playlists (.m3u8) change constantly for live
+// streams, and segment files (.ts/.m4s) are requested with Range headers
+// that the Cache API does not honor correctly, which breaks playback in
+// some browsers once a stale/partial response gets served from cache.
+const STREAMING_EXTENSIONS = [".m3u8", ".ts", ".m4s", ".key", ".aac"];
 
 function isCacheable(url) {
   return url.startsWith("http://") || url.startsWith("https://");
+}
+
+function isStreamingRequest(url) {
+  const pathname = new URL(url).pathname.toLowerCase();
+  return STREAMING_EXTENSIONS.some((ext) => pathname.endsWith(ext));
 }
 
 self.addEventListener("install", (event) => {
@@ -36,24 +47,28 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
-
   if (!isCacheable(request.url)) return;
 
   const url = new URL(request.url);
 
+  // Never intercept HLS playlists or media segments - let the browser
+  // and video/hls.js handle these directly over the network, always.
+  if (isStreamingRequest(request.url)) return;
+
+  // Never intercept Range requests (partial content) - the Cache API
+  // does not support them correctly and this can freeze video playback.
+  if (request.headers.has("range")) return;
+
   if (url.pathname.startsWith("/api/proxy/")) {
     return;
   }
-
   if (url.pathname.startsWith("/api/worldcup/")) {
     event.respondWith(networkFirstWithCache(request));
     return;
   }
-
   if (url.pathname.startsWith("/api/")) {
     return;
   }
-
   if (
     request.destination === "document" ||
     url.pathname.startsWith("/src/") ||
@@ -62,7 +77,6 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(networkFirst(request));
     return;
   }
-
   event.respondWith(cacheFirst(request));
 });
 
