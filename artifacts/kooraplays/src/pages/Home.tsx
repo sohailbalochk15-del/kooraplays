@@ -77,7 +77,7 @@ export default function Home() {
             {t.heroDesc}
           </p>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-2 md:mt-4 w-full sm:w-auto">
-            <Link href="/live" className="w-full sm:w-auto">
+            <Link href="https://www.finx24.com/2026/07/emirates-first-class-a380-reviews-or.html" className="w-full sm:w-auto">
               <Button
                 size="lg"
                 className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground
